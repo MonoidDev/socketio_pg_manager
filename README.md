@@ -6,7 +6,7 @@ Postgres client manager for [python-socketio](https://python-socketio.readthedoc
 # Install
 
 ```bash
-python3 -m pip install -r socketio_pg_manager
+python3 -m pip install -r socketio-pg-manager
 ```
 
 # Usage
