@@ -1,3 +1,5 @@
+[![PyPI - Version](https://img.shields.io/pypi/v/socketio-pg-manager?color=%23006dad)](https://pypi.org/project/socketio-pg-manager/)
+
 Socket PG Manager
 ===============
 
