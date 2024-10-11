@@ -4,6 +4,7 @@ import traceback
 
 import psycopg
 
+from psycopg_pool import AsyncConnectionPool
 from socketio.async_pubsub_manager import AsyncPubSubManager
 
 
@@ -45,8 +46,7 @@ class AsyncPgManager(AsyncPubSubManager):
             )
 
         self.pg_options = pg_options or {}
-        self.pg_options["conninfo"] = conninfo
-        self.connection = None
+        self.async_connection_pool = AsyncConnectionPool(conninfo, **self.pg_options, open=True)
         super().__init__(channel=channel, write_only=write_only, logger=logger)
 
     async def _publish(self, data):
@@ -54,21 +54,15 @@ class AsyncPgManager(AsyncPubSubManager):
 
         for i in range(retry_count):
             try:
-                if not self.connection or i > 0:
-                    self.connection = await psycopg.AsyncConnection.connect(
-                        **self.pg_options
-                    )
-
-                async with self.connection.cursor() as acur:
-                    await acur.execute(
-                        f"SELECT pg_notify(%s, %s)",
-                        (
-                            self.channel,
-                            json.dumps(data),
-                        ),
-                    )
-
-                    await self.connection.commit()
+                async with self.async_connection_pool.connection() as aconn:
+                    async with aconn.cursor() as acur:
+                        await acur.execute(
+                            f"SELECT pg_notify(%s, %s)",
+                            (
+                                self.channel,
+                                json.dumps(data),
+                            ),
+                        )
                 return
             except psycopg.OperationalError:
                 self._get_logger().error(
@@ -86,9 +80,7 @@ class AsyncPgManager(AsyncPubSubManager):
 
         while True:
             try:
-                async with await psycopg.AsyncConnection.connect(
-                    **self.pg_options
-                ) as aconn:
+                async with self.async_connection_pool.connection() as aconn:
                     async with aconn.cursor() as acur:
                         await acur.execute(f"LISTEN {self.channel};")
                         await aconn.commit()
